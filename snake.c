@@ -6,7 +6,6 @@
 #define MOVE_EVERY 40 
 #define MOVE_QUEUE_MAX 10
 #define BLOCK_SQUARE 20
-#define SNAKE_GROW_RATE 2 // if it eats 1 food it grows by 2 squares
 
 typedef struct {
     SDL_Rect *rects;
@@ -67,7 +66,7 @@ foodNode* removeFood(foodNode *first, int i) {
     return first;
 }
 
-void queue_add(int i) {
+void enqueue(int i) {
     if (queue_head - queue_end == 10) {
         fprintf(stderr, "UHOH! MOVE QUEUE FULL!");
     }
@@ -85,44 +84,10 @@ int dequeue(int current_dir) {
     
 }
 
-SDL_Rect move_rect(SDL_Surface *psurface, SDL_Rect rect, int direct) {
-    SDL_Rect new_loc;
-    switch (direct) {
-        case 0: 
-            new_loc = (SDL_Rect){rect.x % WIDTH, (rect.y - BLOCK_SQUARE + HEIGHT) % HEIGHT, rect.w, rect.h};
-            break; 
-        case 1:
-            new_loc = (SDL_Rect){(rect.x + BLOCK_SQUARE + HEIGHT) % WIDTH, rect.y % HEIGHT, rect.w, rect.h};
-            break;
-        case 2:
-            new_loc = (SDL_Rect){rect.x % WIDTH, (rect.y + BLOCK_SQUARE + HEIGHT) % HEIGHT, rect.w, rect.h};
-            break;
-        case 3:
-            new_loc = (SDL_Rect){(rect.x - BLOCK_SQUARE + HEIGHT) % WIDTH, rect.y % HEIGHT, rect.w, rect.h};
-            break;
-        default:
-            new_loc = rect;
-            break;
-    }
-    
-    SDL_FillRect(psurface, &rect, 0x000000);
-    SDL_FillRect(psurface, &new_loc, 0xFFFFFF);
-
-    
-    return new_loc;
-}
-
-int rect_in_snake(Snake *snake, SDL_Rect curr) {
-    for (int i = 0; i < snake->num_s; i++) {
-        if (curr.x == snake->rects[i].x && curr.y == snake->rects[i].y) {
-            return 1;
-        }
-    }
-    return 0;
-}
-int lead_in_snake(Snake *snake, SDL_Rect curr) {
-    for (int i = 1; i < snake->num_s; i++) {
-        if (curr.x == snake->rects[i].x && curr.y == snake->rects[i].y) {
+int snake_collision_check(Snake *snake, SDL_Rect curr, int i) {
+    // int i = 0 if checking for food eaten, i = 1 if for self-collision
+    for (int j = i; j < snake->num_s; j++) {
+        if (curr.x == snake->rects[j].x && curr.y == snake->rects[j].y) {
             return 1;
         }
     }
@@ -161,7 +126,7 @@ void move_snake(SDL_Surface *psurface, Snake *snake, int direction) {
     }
 }
 
-int check_food(foodNode **first, SDL_Rect check) {
+int check_if_food_eaten(foodNode **first, SDL_Rect check) {
     if (!*first) {
         return 0;
     }
@@ -195,7 +160,7 @@ void create_food(SDL_Surface *psurface, Snake *snake, foodNode **first) {
             int x_coord = ((rand() % (WIDTH/BLOCK_SQUARE))) * BLOCK_SQUARE;
             int y_coord = ((rand() % (HEIGHT/BLOCK_SQUARE))) * BLOCK_SQUARE;
             new_food = (SDL_Rect){x_coord, y_coord, BLOCK_SQUARE, BLOCK_SQUARE};
-        } while (rect_in_snake(snake, new_food));
+        } while (snake_collision_check(snake, new_food, 0));
         
         SDL_FillRect(psurface, &new_food, 0xFF0000);
         *first = addFood(*first, &new_food);
@@ -204,7 +169,7 @@ void create_food(SDL_Surface *psurface, Snake *snake, foodNode **first) {
 
 void grow_snake(Snake *snake, foodNode **first, int i, int *score) { 
     int old = *score;
-    *score += check_food(first, snake->rects[0]);
+    *score += check_if_food_eaten(first, snake->rects[0]);
     if (old != *score) {
         for (int l = 0; l < i; l++) {
             SDL_Rect new_rec;
@@ -242,9 +207,21 @@ void snake_init(Snake *snake) {
 }
 
 
-int main() {
+int main(int argv, char *argc[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    
+    int SNAKE_GROW_RATE;
+    if (argv == 1) {
+        SNAKE_GROW_RATE = 2;
+    } else if (argv == 2) {
+        int attempt = atoi(argc[1]);
+        if (attempt <= 0) {
+            printf("Usage: ./snake [growth rate as integer]\n");
+            return -1;
+        }
+        SNAKE_GROW_RATE = attempt;
+    } else {
+        printf("Usage: snake [growth rate as integer]");
+    }
 
     // INITS : ) (no safety checks bc lowk it is what it is)
     SDL_Window *pwindow = SDL_CreateWindow("Practice", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, 0);
@@ -267,18 +244,18 @@ int main() {
             if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.scancode) {
                     case SDL_SCANCODE_W:
-                        queue_add(0);
+                        enqueue(0);
                         break;
                     case SDL_SCANCODE_D:
-                        queue_add(1);
+                        enqueue(1);
 
                         break;
                     case SDL_SCANCODE_S:
-                        queue_add(2);
+                        enqueue(2);
 
                         break;
                     case SDL_SCANCODE_A:
-                        queue_add(3);
+                        enqueue(3);
                         break;
                     default:
                         break;
@@ -297,7 +274,7 @@ int main() {
                 direct = new;
             }
             move_snake(psurface, &snake, direct);
-            if (lead_in_snake(&snake, snake.rects[0])) {
+            if (snake_collision_check(&snake, snake.rects[0], 1)) {
                 quit = 1;
             }
         }
