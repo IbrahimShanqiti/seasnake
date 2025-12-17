@@ -6,7 +6,7 @@
 #define MOVE_EVERY 40 
 #define MOVE_QUEUE_MAX 10
 #define BLOCK_SQUARE 20
-#define SNAKE_GROW_RATE 10 // if it eats 1 food it grows by 2 squares
+#define SNAKE_GROW_RATE 2 // if it eats 1 food it grows by 2 squares
 
 typedef struct {
     SDL_Rect *rects;
